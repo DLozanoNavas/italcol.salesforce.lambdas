@@ -11,7 +11,7 @@ class ItalcolSalesforceLambdasStack(Stack):
 
         # Lambda function is setup
         lambda_function = lambda_.Function(
-            self, "MyLambdaFunction",
+            self, "salesforce-terceros-casabaysanta",
             runtime=lambda_.Runtime.PYTHON_3_12,
             handler="lambda_function.lambda_handler",
             code=lambda_.Code.from_asset("lambda")
