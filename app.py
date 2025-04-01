@@ -3,7 +3,7 @@ import os
 
 import aws_cdk as cdk
 
-from italcol.salesforce.lambdas.italcol.salesforce.lambdas_stack import ItalcolSalesforceLambdasStack
+from italcol_salesforce_lambdas.italcol_salesforce_lambdas_stack import ItalcolSalesforceLambdasStack
 
 
 app = cdk.App()
