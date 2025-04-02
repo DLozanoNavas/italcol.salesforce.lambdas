@@ -9,7 +9,7 @@ app = cdk.App()
 ItalcolSalesforceLambdasStack(app, "ItalcolSalesforceLambdasStack",
 
     # Stack deployed with corresponding account and region configured
-    env=cdk.Environment(account=os.environ["CDK_DEFAULT_ACCOUNT"], region=os.environ["CDK_DEFAULT_REGION"]),
+    env=cdk.Environment(account="123456789012", region="us-east-1"),
     )
 
 app.synth()
