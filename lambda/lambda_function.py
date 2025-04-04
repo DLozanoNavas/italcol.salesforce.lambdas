@@ -4,8 +4,12 @@ import time
 import requests
 
 VIEWS = {
-    "PUNTO_ENVIO" : "SELECT * FROM vwSalesforce_PuntoEnvio", #TODO Subject to future changes
+    "PUNTO_ENVIO" : "SELECT * FROM vwSalesforce_PuntoEnvio", # Subject to future changes, limit which fields are being recovered
     "THIRD_PARTIES" : "SELECT * FROM vwSalesforce_Terceros"
+}
+API_ENDPOINTS = {
+    "PUNTO_ENVIO" : "http://localhost:1234",    # TODO retrieve from env variables and use real urls
+    "THIRD_PARTIES" : "http://localhost:1234"   # TODO retrieve from env variables and use real urls
 }
 
 AUTH_URL = "" #TODO Add the authentication url
@@ -41,8 +45,12 @@ def lambda_handler(event, context):
         cursor.execute(query)
         db_row = cursor.fetchone()
 
-        # With query performed mapped the recieved data to a body
+        # Authenticate to perform latter REST requests
+        # auth_token = get_auth_token()
+
+        # Map query data to a body, then post body to the selected url
         body = map_from_view(selected_view, db_row)
+        # requests.post(url= API_ENDPOINTS[selected_view], json=body, headers={"Content-Type" : "application/json", "Authorization": f"Bearer {auth_token}"}) TODO: Test this out
 
         # Close connection
         cursor.close()
@@ -60,6 +68,7 @@ def lambda_handler(event, context):
         }
     
 def map_from_view(selected_view, db_row):
+    #TODO implement mapping logic based on what view was selected
     print(db_row)
 
 
@@ -71,5 +80,3 @@ def get_auth_token():
         return token_data.get("access_token")
     
     raise Exception(f"Authentication failed: {response.text}")
-
-# TODO: Implementation for api endpoint calling
