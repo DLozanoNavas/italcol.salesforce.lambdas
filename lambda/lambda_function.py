@@ -1,10 +1,19 @@
 import pymssql
 import os
+import time
+import requests
 
 VIEWS = {
     "PUNTO_ENVIO" : "SELECT * FROM vwSalesforce_PuntoEnvio", #TODO Subject to future changes
     "THIRD_PARTIES" : "SELECT * FROM vwSalesforce_Terceros"
-}    
+}
+
+AUTH_URL = "" #TODO Add the authentication url
+AUTH_BODY = {
+    "username": os.getenv("AUTH_USER"),
+    "password": os.getenv("AUTH_PASSWORD")
+}
+auth_token = ""
 
 def lambda_handler(event, context):
     try:
@@ -24,7 +33,7 @@ def lambda_handler(event, context):
         if selected_view not in VIEWS:
             return {
             "statusCode": 500,
-            "body": f"Invalid Query Type"
+            "body": f"Invalid View Selected"
           }
         
         # Select view and perform query
@@ -53,4 +62,14 @@ def lambda_handler(event, context):
 def map_from_view(selected_view, db_row):
     print(db_row)
 
-# TODO implement logic to authenticate and consume from an API, endpoint based on which view was selected to be executed.
+
+# Authentication method, returns the token string to be later added to the requests header
+def get_auth_token():
+    response = requests.post(AUTH_URL, json=AUTH_BODY, headers={"Content-Type": "application/json"})
+    if response.status_code == 200:
+        token_data = response.json()
+        return token_data.get("access_token")
+    
+    raise Exception(f"Authentication failed: {response.text}")
+
+# TODO: Implementation for api endpoint calling
