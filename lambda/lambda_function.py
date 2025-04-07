@@ -43,14 +43,17 @@ def lambda_handler(event, context):
         # Select view and perform query
         query = VIEWS[selected_view]
         cursor.execute(query)
-        db_row = cursor.fetchone()
+        db_rows = cursor.fetchone()
 
         # Authenticate to perform latter REST requests
         # auth_token = get_auth_token()
 
         # Map query data to a body, then post body to the selected url
-        body = map_from_view(selected_view, db_row)
-        # requests.post(url= API_ENDPOINTS[selected_view], json=body, headers={"Content-Type" : "application/json", "Authorization": f"Bearer {auth_token}"}) TODO: Test this out
+        bodies_from_view = map_from_view(selected_view, db_rows)
+        for body in bodies_from_view:
+            print(body)
+            # TODO: Uncomment next line, first the auth logic must be well implemented and tested
+            # requests.post(url= API_ENDPOINTS[selected_view], json=body, headers={"Content-Type" : "application/json", "Authorization": f"Bearer {auth_token}"})            
 
         # Close connection
         cursor.close()
@@ -67,9 +70,13 @@ def lambda_handler(event, context):
             "body": f"Error en la conexión: {str(e)}"
         }
     
-def map_from_view(selected_view, db_row):
-    #TODO implement mapping logic based on what view was selected
-    print(db_row)
+def map_from_view(selected_view, db_rows):
+    # Mapping logic based on what view was selected
+    # TODO: Map data using client requirements (still pending)
+    if selected_view == "PUNTO_ENVIO":
+        return [{} for row in db_rows]
+    elif selected_view == "THIRD_PARTIES":
+        return [{} for row in db_rows]
 
 
 # Authentication method, returns the token string to be later added to the requests header
