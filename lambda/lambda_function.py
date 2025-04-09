@@ -3,14 +3,6 @@ import os
 import requests
 import json
 
-AUTH_URL = "" #TODO Add the authentication url from env variables
-AUTH_BODY = {
-    "username": os.getenv("AUTH_USER"),
-    "password": os.getenv("AUTH_PASSWORD")
-}
-BASE_URL = ""
-auth_token = ""
-
 def lambda_handler(event, context):
     try:
         with open("config.json", "r") as file:
