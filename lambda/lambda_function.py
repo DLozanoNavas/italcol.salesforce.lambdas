@@ -50,6 +50,7 @@ def lambda_handler(event, context):
         # Authenticate to perform latter REST requests
         auth_response = get_auth_token(config["AUTH_URL"], config["AUTH_PARAMS"])
         
+        print(auth_response["base_url"])        
         for row in rows:
             print(row)
             # Map query data to a JSON body, then post body to the selected url
