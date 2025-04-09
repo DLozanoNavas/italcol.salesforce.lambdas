@@ -74,7 +74,7 @@ def lambda_handler(event, context):
 
         return {
             "statusCode": 200,
-            "body": ""
+            "body": auth_response["base_url"]
         }
 
     except Exception as e:
