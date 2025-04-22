@@ -46,17 +46,30 @@ def lambda_handler(event, context):
         # Send the mapped results from the Views to the respective salesforce endpoints
         success_responses = []
         failed_responses = []
-        duplicated_responses = []
+        updated_records = []
         for body in mapped_data:
             try:
+                salesforce_url = f"{auth_response['base_url']}{config['API_URI']}"
+                record = check_salesforce_record(selected_company, body.get("AccountNumber"))
                 # Query dynamo to check if accountnumber (nit) and company is already added
-                if check_salesforce_record(selected_company, body.get("AccountNumber")):
-                    duplicated_responses.append(body)
-                    continue
-                # If not on dynamo, create
+                if record:
+                    # PATCH existing Salesforce record
+                    salesforce_id = record.get("id_salesforce")
+                    if not salesforce_id:
+                        raise Exception(f"Missing 'id_salesforce' in DynamoDB record for {body.get('AccountNumber')}")
+                    response = requests.patch(
+                        url = f"{salesforce_url}/{salesforce_id}",
+                        json = body,
+                        headers={
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {auth_response['access_token']}"
+                        }
+                    )
+                    updated_records.append(response)
                 else:
+                    # If not on dynamo, POST new salesforce record
                     response = requests.post(
-                        url = f"{auth_response['base_url']}{config['API_URI']}",
+                        url = salesforce_url,
                         json = body,
                         headers = {"Content-Type" : "application/json", "Authorization" : f"Bearer {auth_response['access_token']}"}
                     )
@@ -81,7 +94,7 @@ def lambda_handler(event, context):
                 "message": "Success",
                 "records_sent": len(success_responses),
                 "failed_records": len(failed_responses),
-                "salesforce_duplicated": len(duplicated_responses)
+                "updated_records": len(updated_records)
             })
         }
 
@@ -105,4 +118,4 @@ def check_salesforce_record(name, nit):
             'nit': nit
         }
     )
-    return "Item" in response
+    return response.get("Item")
