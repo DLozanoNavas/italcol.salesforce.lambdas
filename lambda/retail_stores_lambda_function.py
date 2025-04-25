@@ -11,7 +11,7 @@ required_config_keys = ["VIEW", "AUTH_PARAMS", "AUTH_URL", "API_URI"] # This are
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table("salesforce")
 
-# Lambda handler for the THIRD PARTIES view
+# Lambda handler for the RETAIL STORES view
 def lambda_handler(event, context):
     try:
         # Open config file
@@ -38,49 +38,20 @@ def lambda_handler(event, context):
         rows = [dict(zip(columns,row)) for row in cursor.fetchall()]
         mapped_data = mapper.map_from_view(selected_company, rows)
 
-        # Authenticate against salesforce API        
+        # Authenticate against salesforce API
         auth_params = config["AUTH_PARAMS"]         #NOTE this should be retrieved from SecretsManager when using prod credentials
         auth_url = config["AUTH_URL"]
         auth_response = salesforce.authenticate(auth_url, auth_params)
-
+        auth_response["base_url"] = f"{auth_response['base_url']}{config['API_URI']}"
         # Send the mapped results from the Views to the respective salesforce endpoints
         success_responses = []
         failed_responses = []
-        updated_records = []
         for body in mapped_data:
             try:
-                salesforce_url = f"{auth_response['base_url']}{config['API_URI']}"
-                record = check_salesforce_record(selected_company, body.get("AccountNumber"))
-                # Query dynamo to check if accountnumber (nit) and company is already added
-                if record:
-                    # PATCH existing Salesforce record
-                    salesforce_id = record.get("id_salesforce")
-                    if not salesforce_id:
-                        raise Exception(f"Missing 'id_salesforce' in DynamoDB record for {body.get('AccountNumber')}")
-                    response = requests.patch(
-                        url = f"{salesforce_url}/{salesforce_id}",
-                        json = body,
-                        headers={
-                            "Content-Type": "application/json",
-                            "Authorization": f"Bearer {auth_response['access_token']}"
-                        }
-                    )
-                    updated_records.append(response)
-                else:
-                    # If not on dynamo, POST new salesforce record
-                    response = requests.post(
-                        url = salesforce_url,
-                        json = body,
-                        headers = {"Content-Type" : "application/json", "Authorization" : f"Bearer {auth_response['access_token']}"}
-                    )
-                    table.put_item(
-                        Item = {
-                            'compania': selected_company,
-                            'nit' : body.get("AccountNumber"),
-                            'id_salesforce': response.json().get("id")
-                        }
-                    )
-                    success_responses.append(response.json())
+                third_party_nit = body.pop("id_sucursal").split("-")[0]
+                
+                # Query dynamo to check if third party with accountnumber (nit) and company exists
+                add_retail_store_if_not_exists(selected_company, third_party_nit, body, auth_response)
             except Exception as e:
                 failed_responses.append({"error":str(e)})
 
@@ -92,9 +63,9 @@ def lambda_handler(event, context):
             "statusCode": 200,
             "body": json.dumps({
                 "message": "Success",
-                "records_sent": len(success_responses),
-                "failed_records": len(failed_responses),
-                "updated_records": len(updated_records)
+                "company": selected_company,
+                "records_sent": len(success_responses), #TODO update logs for better trazability
+                "failed_records": failed_responses
             })
         }
 
@@ -119,3 +90,40 @@ def check_salesforce_record(name, nit):
         }
     )
     return response.get("Item")
+
+def add_retail_store_if_not_exists(company, nit, new_retail_store, auth_response):
+    # Adds new record to the sucursales field in dynamodb table if there's no item with the same id_erp
+
+    response = table.get_item(Key={'compania': company, 'nit':nit})
+    item = response.get("Item")
+
+    if not item:
+        raise Exception(f"No third party with nit {nit} was found associated with company {company}")
+    
+    salesforce_account_id = item.get("id_salesforce_tercero")
+    existing_retail_stores = item.get("sucursales", [])
+
+    salesforce_url = auth_response['base_url']
+    access_token = auth_response['access_token']
+
+    for store in existing_retail_stores:
+        if store["id_erp"] == new_retail_store["id_sucursal"]:
+            # Send PATCH endpoint
+            return
+    
+    # Send POST with new retail store and retrieve new retailstore id from salesforce
+    new_retail_store["AccountId"] = salesforce_account_id
+    
+    post_response = requests.post(
+        url = salesforce_url,
+        json = new_retail_store,
+        headers ={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {access_token}"
+        }
+    )
+    if post_response.status_code not in [200, 201]:
+        raise Exception(f"Error al crear sucursal en Salesforce: {post_response.text}")
+    
+    print(post_response.json())
+    existing_retail_stores.append({"id_erp":new_retail_store["id_sucursal"], "id_salesforce_tercero":""})
