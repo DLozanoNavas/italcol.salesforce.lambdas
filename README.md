@@ -31,6 +31,12 @@ This AWS Lambda functions extracts data from a SQL Server view related to specif
 | dynamo_service.py         | Reads/writes Salesforce ID mappings from DynamoDB         |
 | allowed_companies.py      | Whitelists valid selected_company values                  |
 
+## Architecture
+
+This will be deployed in a AWS instance with the current structure
+
+![Diagrama arquitectura](/static/diagram.jpg)
+
 ## Configuration
 
 All settings are read from a config.json file, bundled with the Lambda:
