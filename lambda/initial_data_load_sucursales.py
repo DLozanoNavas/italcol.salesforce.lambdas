@@ -1,4 +1,5 @@
 import pandas as pd
+import time
 import mapper
 import requests
 import salesforce
@@ -144,10 +145,6 @@ def check_duplicate_existing_salesforce_records(mapped_data):
     else:
       print(f"Skipping {mapped_records-filtered_records} existing records, posting {filtered_records} records to SalesForce")
     return filtered_data
-
-import time
-import sys
-import requests
 
 def post_new_salesforce_records(url: str, auth_data: dict, data: list[dict]):
     headers = {
