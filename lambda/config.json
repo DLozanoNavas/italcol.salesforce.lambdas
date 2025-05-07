@@ -1,0 +1,27 @@
+{
+  "VIEWS" : {
+    "PUNTO_ENVIO" : "SELECT * FROM vwSalesforce_PuntoEnvio",
+    "THIRD_PARTIES" : "SELECT * FROM vwSalesforce_Terceros"
+  },
+  "AUTH_URL" : "https://test.salesforce.com/services/oauth2/token",
+  "API_URIS" : {
+    "QUERY":{
+      "PUNTO_ENVIO" : "/services/data/v63.0/query/?q=SELECT+Id,AccountId,ti_Id_PV_ERP_Italhuevo__c,ti_Id_PV_ERP_Casablanca__c,Id_PV_ERP_Balanceados__c+FROM+RetailStore",
+      "TERCEROS" : "/services/data/v63.0/query/?q=SELECT+Id,Id_Cliente_ERP_Casablanca__c,Id_Cliente_ERP_Italhuevo__c,Id_Cliente_ERP_Balanceados__c+FROM+Account",
+      "ACUERDOS" : "/services/data/v63.0/query/?q=SELECT+Id,Id_AC_ERP_balanceados__c,ac_Cuenta__c+FROM+Acuerdo_Comercial__c"
+    },
+    "POST":{
+      "PUNTO_ENVIO" : "/services/data/v63.0/composite/sobjects/",
+      "TERCEROS" : "/services/data/v63.0/composite/sobjects/",
+      "ACUERDOS" : "/services/data/v63.0/composite/sobjects/"
+    }
+  },
+  "UPDATE_SALESFORCE_RECORDS" : true,
+  "AUTH_PARAMS":{
+    "grant_type": "password",
+    "client_id": "your-client-id",
+    "client_secret": "your-client-secret",
+    "username": "user@example.com",
+    "password": "your-password"
+  }
+}
