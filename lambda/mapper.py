@@ -31,17 +31,19 @@ def map_third_parties_from_view(selected_company, db_rows):
 
         if tipo_ident == 2: # Entidad juridica
             row_body["Name"] = safe_get(row, "f200_razon_social", idx)
-            row_body["cu_colaborador_grupo_italcol__c"] = False
+            row_body["cu_colaborador_grupo_italcol__c"] = "false"
             #row_body["Nombre_Comercial__c"] = safe_get(row,"f200_nombre_est",idx) #Aplica para todos
         elif tipo_ident : # 
             row_body["FirstName"] = safe_get(row, "f200_nombres", idx)
             row_body["LastName"] = f"{safe_get(row, 'f200_apellido1', idx)} {safe_get(row, 'f200_apellido2', idx)}"
             row_body["Salutation"] = "Sr(a)."
-            row_body["cu_colaborador_grupo_italcol__c"] = True
 
             if safe_get(row, "f200_ind_empleado", idx) == 1:
+                row_body["cu_colaborador_grupo_italcol__c"] = "true"
                 row_body["cu_compania__c"] = selected_company # cu_compania__c
-
+            else:
+                row_body["cu_colaborador_grupo_italcol__c"] = "false"
+         
         if selected_company == "ITALCOL":
             row_body["cu_Clasificacion_de_Cliente__c"] =  safe_get(row,"ClasificacionCliente", idx) # Solo Italcol
             row_body["cu_Tipo_Cuenta__c"] = "Cliente" #Solo italcol
@@ -90,7 +92,7 @@ def map_retail_stores_from_view(selected_company, db_rows):
             "Name" : safe_get(row, "des_sucursal", idx),#Nombre punto de envio
             "ti_nombre_comercial__c" : safe_get(row, "f201_descripcion_sucursal", idx),
             #"ti_bodega__c" : safe_get(row, "f206_descripcion", idx), #Bodega
-            #"Street" : safe_get(row, "f015_direccion1", idx),
+            "Street" : safe_get(row, "f015_direccion1", idx),
             "City": safe_get(row, "f013_descripcion", idx),
             "State" : safe_get(row, "f012_descripcion", idx),
             "Country" : safe_get(row, "f011_descripcion", idx),
@@ -108,7 +110,7 @@ def map_retail_stores_from_view(selected_company, db_rows):
             "cu_plazo__c" : safe_get(row, "f201_cond_pago_desc", idx),
             "cu_cupo__c" : safe_get(row, "f201_cupo_credito", idx),
             "cu_descuentos__c" : safe_get(row, "f201_tasa_dscto_global_cap", idx),
-            email_field_name : safe_get(row, "f015_email", idx), # Falta
+            email_field_name : safe_get(row, "f015_email", idx),
             "id_sucursal": safe_get(row, "f201_id_sucursal", idx),
             "ti_Regional__c": safe_get(row, "Nombre_Regional", idx),
             "ti_Descripcion_Condicion_de_Pago__c": safe_get(row, "f201_cond_pago_desc", idx),
@@ -143,7 +145,7 @@ def map_acuerdos_from_view(selected_company, db_rows):
             "ac_Correo_Electronico__c": row["FE_Email"],
             "OwnerId": "005DZ00000AbiuB",
             "ac_Linea_que_maneja__c": row["v207_descripcion_L"],
-            "ac_estado__c": row["f201_ind_estado_activo"],
+            "ac_estado__c": row["f201_ind_estado_activo"]
         }
         mapped_list.append(row_body)    
     return mapped_list

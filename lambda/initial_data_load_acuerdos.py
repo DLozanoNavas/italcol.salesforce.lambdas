@@ -112,31 +112,35 @@ def check_duplicate_existing_salesforce_records(mapped_data):
         print(f"Error reading existing Salesforce records: {e}")
         return mapped_data  # fallback: assume none are duplicates
     # Gather all existing ERP IDs from sucursales
-    existing_erp_keys = set()
+    existing_erp_keys = {}
     for record in existing_records:
         for sucursal in record.get("sucursales").get("L", []):
             id_erp = sucursal.get("M").get("id_erp").get("S")
-            if id_erp:
-                existing_erp_keys.add(id_erp)
+            salesforce_id = sucursal.get("M").get("id_salesforce_sucursal").get("S")
+            if id_erp and salesforce_id:
+                existing_erp_keys[id_erp] = salesforce_id 
+    
     filtered_data = []
     already_existing_data = []
-    for row in mapped_data:
+    for record in mapped_data:
         # Determine which ERP ID key is present
         erp_id = (
-            row.get("Id_AC_ERP_balanceados__c")
+            record.get("Id_AC_ERP_balanceados__c")
         )
         
         if erp_id not in existing_erp_keys:
-            filtered_data.append(row)
+            filtered_data.append(record)
         else:
-           already_existing_data.append(row)
+          existing_record = record.copy()
+          existing_record["id_salesforce_sucursal"] = existing_erp_keys[id_erp]
+          already_existing_data.append(existing_record)
 
     filtered_records, mapped_records = len(filtered_data), len(mapped_data)
     if filtered_records == mapped_records:
       print(f"There are no duplicated records, posting all {mapped_records} records to SalesForce")
     else:
       print(f"Skipping {mapped_records-filtered_records} existing records, posting {filtered_records} records to SalesForce")
-    return filtered_data
+    return filtered_data, already_existing_data
 
 def post_new_salesforce_records(url: str, auth_data: dict, data: list[dict]):
     headers = {
@@ -198,6 +202,67 @@ def post_new_salesforce_records(url: str, auth_data: dict, data: list[dict]):
     total_time = time.time() - start_time
     print(f"\nFinished posting {total} records in {total_time:.2f}s.")
 
+def match_account_id_to_acuerdo(stores_list):
+  existing_records = load_existing_records()
+  indexed_records = {item['nit'].get("S"): item for item in existing_records}
+  valid_data = []
+
+  for body in stores_list:
+        third_party_nit = body["Id_AC_ERP_balanceados__c"].split('-')[0]
+        if not indexed_records.get(third_party_nit):
+            print(f"Third party with nit {third_party_nit} not found, skipping")
+        else:
+            third_party_sf_id = indexed_records[third_party_nit]['id_salesforce_tercero']['S']
+            body["AccountId"] = third_party_sf_id
+            valid_data.append(body)
+  return valid_data
+
+def patch_existing_records(existing_records: list[dict], auth_data: list[dict]):
+  base_url = auth_data["base_url"]
+  access_token = auth_data["access_token"]
+  
+  headers = {
+    "Authorization": f"Bearer {access_token}",
+    "Content-Type": "application/json"
+  }
+
+  batch_size = 200  # Salesforce limit
+  errors = []
+  start_time = time.time()
+  valid_records = existing_records
+  #valid_records = match_account_id_to_acuerdo(existing_records)
+  total = len(valid_records)
+  url = f"{base_url}/services/data/v63.0/composite/sobjects"
+  for idx in range(0, total, batch_size):
+    batch = valid_records[idx:idx+batch_size]
+
+    records_payload = [
+      {
+        "attributes": {"type": "Acuerdo_Comercial__c"},
+        "Id": record.pop("id_salesforce_sucursal"),
+        **record
+      }
+      for record in batch
+      if "id_salesforce_sucursal" in record
+    ]
+
+    payload = {
+      "allOrNone": False,
+      "records": records_payload
+    }
+    print(f"{idx} records updated")
+    response = requests.patch(url=url, headers=headers, json=payload)
+    if response.status_code != 200:
+      print(f"Batch {idx} failed: {response.text}")
+      errors.append(response.text)
+  elapsed = time.time() - start_time
+  print(f"Finished updating {total} records in {elapsed:.2f} seconds.")
+
+  if errors:
+    print(f"Encountered {len(errors)} errors during batch update.")
+  else:
+    print("All records updated successfully.")
+
 if __name__ == "__main__":
     # Load data from excel file and map it to a salesforce compatible format
     path = "../Acuerdos.xlsx"
@@ -214,5 +279,6 @@ if __name__ == "__main__":
     if config["UPDATE_SALESFORCE_RECORDS"]:
       update_existing_salesforce_records(get_url, auth_result)
     
-    filtered_duplicate_data = check_duplicate_existing_salesforce_records(mappedData)
-    post_new_salesforce_records(post_url, auth_result, filtered_duplicate_data)
+    filtered_duplicate_data, existing_data = check_duplicate_existing_salesforce_records(mappedData)
+    patch_existing_records(existing_records=existing_data, auth_data=auth_result)
+    #post_new_salesforce_records(post_url, auth_result, filtered_duplicate_data)

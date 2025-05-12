@@ -23,7 +23,7 @@ companies_dict = {
    }
 }
 
-selected_company = "sr"
+selected_company = "cb"
 
 def load_views_from_file(filepath: str, sheet_name: str) -> list[dict]:
   try:
@@ -105,17 +105,31 @@ def check_duplicate_existing_salesforce_records(mappedData: list[dict]):
   data = [item for item in data if item.get('compania')['S'] == company]
   
   # Builds a set with all of the nit values to exclude
-  nit_set = [int(item['nit']['S']) for item in data if 'nit' in item]
+  nit_set = {
+    int(item['nit']['S']) : item['id_salesforce_tercero']['S'] 
+    for item in data if 'nit' in item
+  }
 
   # Exclude items with matching AccountNumber in mappedData
-  filtered_mappedData = [entry for entry in mappedData if entry.get('AccountNumber') not in nit_set]
+  filtered_mappedData = []
+  excluded_data = []
+
+  for entry in mappedData:
+    account_number = entry.get("AccountNumber")
+    if account_number not in nit_set:
+      filtered_mappedData.append(entry)
+    else:
+      excluded_entry = entry.copy()
+      print(nit_set[account_number])
+      excluded_entry["id_salesforce_tercero"] = nit_set[account_number]
+      excluded_data.append(excluded_entry)
 
   filtered_records, mapped_records = len(filtered_mappedData), len(mappedData) 
   if filtered_records == mapped_records:
     print(f"There are no duplicated records, posting all {mapped_records} records to SalesForce")
   else:
     print(f"Skipping {mapped_records-filtered_records} existing records, posting {filtered_records} records to SalesForce")
-  return filtered_mappedData
+  return filtered_mappedData, excluded_data
 
 def post_new_salesforce_records(url: str, auth_data: dict, data: list[dict]):
   headers = {
@@ -161,6 +175,53 @@ def post_new_salesforce_records(url: str, auth_data: dict, data: list[dict]):
   print(f"\nFinished posting {total} records in {total_time:.2f}s.")
   return error_list
 
+def patch_existing_records(existing_records: list[dict], auth_data: list[dict]):
+  base_url = auth_data["base_url"]
+  access_token = auth_data["access_token"]
+  
+  headers = {
+    "Authorization": f"Bearer {access_token}",
+    "Content-Type": "application/json"
+  }
+
+  batch_size = 200  # Salesforce limit
+  total = len(existing_records)
+  errors = []
+  start_time = time.time()
+
+  url = f"{base_url}/services/data/v63.0/composite/sobjects"
+  for idx in range(0, total, batch_size):
+    batch = existing_records[idx:idx+batch_size]
+
+    records_payload = [
+      {
+        "attributes": {"type": "Account"},
+        "Id": record.pop("id_salesforce_tercero"),
+        **record
+      }
+      for record in batch
+      if "id_salesforce_tercero" in record
+    ]
+
+    payload = {
+      "allOrNone": False,
+      "records": records_payload
+    }
+
+    response = requests.patch(url=url, headers=headers, json=payload)
+    if response.status_code != 200:
+      print(f"Batch {idx} failed: {response.text}")
+      errors.append(response.text)
+    
+  elapsed = time.time() - start_time
+  print(f"Finished updating {total} records in {elapsed:.2f} seconds.")
+
+  if errors:
+    print(f"Encountered {len(errors)} errors during batch update.")
+  else:
+    print("All records updated successfully.")
+
+
 if __name__ == "__main__":
     # Load data from excel file and map it to a salesforce compatible format
     path = "../Terceros.xlsx"
@@ -177,7 +238,9 @@ if __name__ == "__main__":
     if config["UPDATE_SALESFORCE_RECORDS"]:
       update_existing_salesforce_records(get_url, auth_result)
     
-    filtered_duplicate_data = check_duplicate_existing_salesforce_records(mappedData)
-    post_new_salesforce_records(post_url, auth_result, filtered_duplicate_data)
-    update_existing_salesforce_records(get_url, auth_result)
+    filtered_duplicate_data, excluded_data = check_duplicate_existing_salesforce_records(mappedData[0:10])
+    patch_existing_records(existing_records=excluded_data, auth_data=auth_result)
+    #post_new_salesforce_records(post_url, auth_result, filtered_duplicate_data)
+
+    #update_existing_salesforce_records(get_url, auth_result)
     #print(error_list)
